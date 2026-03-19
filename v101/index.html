@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CAMP: praha zítra?</title>
+  
+  <link rel="icon" href="favicon.png" type="image/png">
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+
+  <style>
+    /* Custom Fonts */
+    @font-face { font-family: 'Antique Legacy Light'; src: url('Antique-Legacy-Light.woff2') format('woff2'); font-weight: 300; }
+    @font-face { font-family: 'Antique Legacy Regular'; src: url('Antique-Legacy-Regular.woff2') format('woff2'); font-weight: normal; }
+
+    html, body { padding: 0; margin: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Antique Legacy Regular', sans-serif; background-color: #000000; }
+
+    #app-container { display: flex; height: 100%; width: 100%; padding: 10px; box-sizing: border-box; gap: 10px; }
+    #viewDiv { flex: 1; height: 100%; border-radius: 10px; overflow: hidden; position: relative; }
+    #infoDiv { flex: 1; height: 100%; background-color: #eeeeee; border-radius: 10px; padding: 30px; box-sizing: border-box; overflow-y: auto; }
+
+    /* Remove the default blue focus outline from the SceneView */
+    .esri-view-surface:focus::after {
+      outline: none !important;
+    }
+
+    /* Custom Attribution Overlay */
+    #customAttribution {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      background-color: rgba(0, 0, 0, 0.65);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 6px 12px;
+      border-radius: 5px;
+      font-family: 'Antique Legacy Light', sans-serif;
+      font-size: 11px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      z-index: 50;
+      pointer-events: none;
+    }
+    
+    .attr-divider {
+      width: 1px;
+      height: 12px;
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Scene Navigation Buttons Styling */
+    .esri-widget--button, 
+    .esri-zoom .esri-widget--button,
+    .esri-navigation-toggle,
+    .esri-compass {
+      border-radius: 8px !important;
+      overflow: hidden;
+    }
+    
+    /* If they are grouped (like Zoom +/-), this ensures the group itself follows the radius */
+    .esri-ui-corner .esri-component {
+      box-shadow: none !important;
+    }
+
+    /* Filter Button Styling */
+    #filterBtn {
+      background-color: #0066FF;
+      color: #FFFFFF;
+      font-family: 'Antique Legacy Light', sans-serif;
+      font-size: 12px;
+      
+      /* Typography updates */
+      letter-spacing: .3em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      transition: background-color 0.2s;
+    }
+    #filterBtn:hover {
+      background-color: #0055d4;
+    }
+
+    .esri-widget, .esri-widget * { font-family: 'Antique Legacy Regular', sans-serif !important; }
+    
+    /* Headers explicitly set to normal weight */
+    .static-title, .esri-feature__title { 
+      margin: 40px 0 !important; 
+      font-size: 34px !important; 
+      font-family: 'Antique Legacy Light', sans-serif !important; 
+      font-weight: normal !important;
+      color: #000000 !important; 
+      background: none !important; 
+      padding: 0 !important; 
+      line-height: 1.2; 
+    }
+    
+    /* Default Intro Text Styling */
+    #placeholderMessage { 
+      color: #000000; 
+      font-size: 18px; 
+      font-family: 'Antique Legacy Light', sans-serif;
+      font-weight: normal;
+      line-height: 1.5;
+    }
+    #placeholderMessage p {
+      margin-bottom: 20px;
+    }
+    #placeholderMessage a {
+      color: #000000;
+      text-decoration: underline;
+    }
+    #placeholderMessage a:hover {
+      color: #00FF00;
+    }
+
+    /* Feature Table Styling */
+    .esri-feature { background-color: transparent !important; }
+    .esri-feature__content-element .esri-widget__table { border: none !important; width: 100%; margin-top: 10px;}
+    .esri-feature__content-element .esri-widget__table tr, th, td { border: none !important; background-color: transparent !important; }
+    
+    /* Tighter left column width so values move left */
+    .esri-feature__content-element .esri-widget__table th { 
+      width: 140px; 
+      font-family: 'Antique Legacy Light', sans-serif !important; 
+      font-size: 18px; 
+      padding: 12px 15px 12px 0; 
+      font-weight: normal; 
+      text-align: left; 
+      vertical-align: top; 
+    }
+    .esri-feature__content-element .esri-widget__table td { 
+      font-family: 'Antique Legacy Light', sans-serif !important; 
+      font-size: 18px; 
+      padding: 12px 0; 
+      line-height: 1.5; 
+      vertical-align: top; 
+    }
+    .esri-feature__content-element a { color: #000000; text-decoration: underline; }
+    .esri-feature__content-element a:hover { color: #00FF00; }
+
+    /* Carousel */
+    #carouselContainer { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; margin-top: 30px; position: relative; background-color: #d3d3d3; }
+    #carouselTrack { display: flex; height: 100%; transition: transform 0.6s ease-in-out; }
+    .carousel-slide { flex: 0 0 100%; background-size: cover; background-position: center; }
+    .carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; z-index: 10; }
+    .carousel-btn svg { filter: drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.6)); }
+    .prev-btn { left: 10px; }
+    .next-btn { right: 10px; }
+    .carousel-dots { position: absolute; bottom: 15px; width: 100%; display: flex; justify-content: center; gap: 8px; }
+    .carousel-dot { width: 10px; height: 10px; background: rgba(255,255,255,0.5); border-radius: 50%; cursor: pointer; }
+    .carousel-dot.active { background: white; }
+  </style>
+
+  <script src="https://js.arcgis.com/4.30/"></script>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/SceneView", 
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Feature",
+      "esri/layers/VectorTileLayer",
+      "esri/layers/ElevationLayer", 
+      "esri/layers/SceneLayer",     
+      "esri/Basemap"
+    ], function(Map, SceneView, FeatureLayer, Feature, VectorTileLayer, ElevationLayer, SceneLayer, Basemap) {
+
+      const pragueBasemap = new Basemap({
+        baseLayers: [new VectorTileLayer({ url: "https://tiles.arcgis.com/tiles/SBTXIEUGWbqzUecw/arcgis/rest/services/zakladni_mapa_3D_model/VectorTileServer" })]
+      });
+
+      const customElevation = new ElevationLayer({ url: "https://tiles.arcgis.com/tiles/SBTXIEUGWbqzUecw/arcgis/rest/services/dtm1m_wgs_test1_3/ImageServer" });
+
+      const map = new Map({
+        basemap: pragueBasemap,
+        ground: { layers: [customElevation] }
+      });
+
+      const view = new SceneView({
+        container: "viewDiv",
+        map: map,
+        qualityProfile: "low",
+        camera: {
+          position: [14.4214, 50.0875, 12000],
+          tilt: 0, 
+          heading: 0 
+        },
+        highlightOptions: {
+          color: [0, 0, 0, 1],
+          haloOpacity: 0.9,
+          fillOpacity: 0.3
+        }
+      });
+
+      view.ui.remove("attribution");
+      
+      // Place the button natively in the top-right corner of the ArcGIS Scene UI
+      view.ui.add("filterBtn", "top-right");
+
+      const buildingsLayer = new SceneLayer({ 
+        url: "https://tiles.arcgis.com/tiles/SBTXIEUGWbqzUecw/arcgis/rest/services/budovy3D_2020_2/SceneServer",
+        popupEnabled: false 
+      });
+      const bridgesLayer = new SceneLayer({ 
+        url: "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Mosty3D_2020/SceneServer",
+        popupEnabled: false 
+      });
+      
+      const featureLayer = new FeatureLayer({
+        url: "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Praha_z%C3%ADtra_%E2%80%93_POI/FeatureServer/0",
+        outFields: ["*"], 
+        popupEnabled: false, 
+        elevationInfo: { mode: "absolute-height" },
+        popupTemplate: {
+          title: "{project_title}",
+          content: [{
+            type: "fields",
+            fieldInfos: [
+              { fieldName: "project_address", label: "Address" },
+              { fieldName: "completion_date", label: "Completion Date" },
+              { fieldName: "site_area", label: "Site Area" },
+              { fieldName: "project_website", label: "Website" },
+              { fieldName: "project_description", label: "Description" }
+            ]
+          }]
+        },
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "point-3d", 
+            symbolLayers: [{ type: "icon", resource: { primitive: "circle" }, material: { color: "#00FF00" }, size: "19px" }],
+            verticalOffset: { 
+              screenLength: 40, 
+              maxWorldLength: 40, 
+              minWorldLength: 40 
+            },
+            callout: { type: "line", size: 1, color: "#000000" }
+          }
+        },
+        labelingInfo: [{
+          labelExpressionInfo: { expression: "Concatenate(Split(Upper($feature.project_title), ''), ' ')" },
+          symbol: { type: "text", color: "#FFFFFF", backgroundColor: "#000000", yoffset: 4, font: { size: 10, family: "Antique Legacy Light" } },
+          labelPlacement: "above-center"
+        }]
+      });
+
+      map.addMany([buildingsLayer, bridgesLayer, featureLayer]);
+
+      const featureWidget = new Feature({
+        container: "featureContent",
+        graphic: null, 
+        map: view.map,
+        spatialReference: view.spatialReference
+      });
+
+      let highlightSelect;
+      const defaultPanel = document.getElementById("defaultPanelContent");
+      const featurePanel = document.getElementById("featureContent");
+      const carouselContainer = document.getElementById("carouselContainer");
+      const carouselTrack = document.getElementById("carouselTrack");
+      const carouselDotsContainer = document.getElementById("carouselDots");
+
+      let carouselInterval, currentSlideIndex = 0, totalSlides = 0;
+
+      window.goToSlide = function(index) {
+        if (totalSlides === 0) return;
+        currentSlideIndex = (index < 0) ? totalSlides - 1 : (index >= totalSlides) ? 0 : index;
+        carouselTrack.style.transform = `translateX(-${currentSlideIndex * 100}%)`;
+        Array.from(carouselDotsContainer.children).forEach((dot, i) => dot.classList.toggle("active", i === currentSlideIndex));
+        startAutoPlay();
+      };
+
+      function startAutoPlay() {
+        clearInterval(carouselInterval);
+        if (totalSlides > 1) carouselInterval = setInterval(() => goToSlide(currentSlideIndex + 1), 4000);
+      }
+
+      view.on("click", (event) => {
+        view.hitTest(event).then((response) => {
+          const results = response.results.filter(r => r.graphic.layer === featureLayer);
+          if (highlightSelect) highlightSelect.remove();
+          clearInterval(carouselInterval);
+          carouselTrack.innerHTML = ""; carouselDotsContainer.innerHTML = ""; carouselContainer.style.display = "none";
+
+          if (results.length > 0) {
+            const hitGraphic = results[0].graphic;
+            const objectId = hitGraphic.attributes[featureLayer.objectIdField];
+            
+            view.whenLayerView(featureLayer).then(lv => highlightSelect = lv.highlight(hitGraphic));
+
+            featureLayer.queryFeatures({
+              objectIds: [objectId],
+              outFields: ["*"],
+              returnGeometry: true
+            }).then(function(featureSet) {
+              if (featureSet.features.length > 0) {
+                const fullFeature = featureSet.features[0];
+                fullFeature.popupTemplate = featureLayer.popupTemplate;
+                featureWidget.graphic = fullFeature;
+                
+                defaultPanel.style.display = "none";
+                featurePanel.style.display = "block";
+              }
+            });
+
+            featureLayer.queryAttachments({ objectIds: [objectId] }).then(res => {
+              const attachments = res[objectId];
+              if (attachments?.length > 0) {
+                let images = attachments.filter(a => a.contentType.includes("image"));
+                totalSlides = images.length;
+                if (totalSlides > 0) {
+                  carouselContainer.style.display = "block";
+                  images.forEach((img, i) => {
+                    const slide = document.createElement("div");
+                    slide.className = "carousel-slide";
+                    slide.style.backgroundImage = `url('${img.url}')`;
+                    carouselTrack.appendChild(slide);
+                    const dot = document.createElement("div");
+                    dot.className = "carousel-dot";
+                    if (i === 0) dot.classList.add("active");
+                    dot.onclick = () => goToSlide(i);
+                    carouselDotsContainer.appendChild(dot);
+                  });
+                  startAutoPlay();
+                }
+              }
+            });
+          } else {
+            featureWidget.graphic = null;
+            defaultPanel.style.display = "block";
+            featurePanel.style.display = "none";
+          }
+        });
+      });
+
+      view.on("pointer-move", (event) => {
+        view.hitTest(event).then(res => {
+          view.container.style.cursor = res.results.some(r => r.graphic.layer === featureLayer) ? "pointer" : "default";
+        });
+      });
+
+      // Click handler for the Filter button
+      document.getElementById("filterBtn").addEventListener("click", () => {
+        console.log("Filter button clicked!");
+      });
+    });
+  </script>
+</head>
+<body>
+  <div id="app-container">
+    <div id="viewDiv">
+      <button id="filterBtn">filtr</button>
+      
+      <div id="customAttribution">
+        <span>Data IPR Praha</span>
+        <div class="attr-divider"></div>
+        <span>Powered by Esri</span>
+      </div>
+    </div>
+    <div id="infoDiv">
+      <div id="defaultPanelContent">
+        <h2 class="static-title">O aplikaci Praha zítra?</h2>
+        <div id="placeholderMessage">
+          <p>Mapový portál Praha zítra? slouží jako základní přehled stavebních záměrů na území hlavního města Prahy. Záměry různých velikostí, na různých místech, v různých stádiích přípravy. Záměry soukromých i veřejných investorů. Od prvních nápadů, přes projekty v procesu přípravy, až po ty, které se již dokončují na staveništích.</p>
+          <p>Stavební záměry lze vyhledávat na mapě, nebo podle názvu a filtrovat podle fáze realizace či městských částí. Každý projekt má svou vlastní kartu, která obsahuje základní data, detailní zákres umístění projektu, obrazový doprovod a stručnou textovou anotaci. Informace obsažené v databázi pocházejí od investorů či projektantů, případně z volně dostupných zdrojů.</p>
+          <p>Účelem mapového portálu Praha zítra? je přinášet a systematizovat základní informace o územním rozvoji hlavního města, nikoliv hodnotit a posuzovat zobrazené projekty.</p>
+          <p>
+            Provozovatel portálu Praha zítra?:<br>
+            Institut plánování a rozvoje hl. m. Prahy<br>
+            <a href="https://www.iprpraha.cz" target="_blank">www.iprpraha.cz</a>
+          </p>
+          <p>
+            Editor obsahu:<br>
+            Centrum architektury a městského plánování (CAMP)<br>
+            <a href="https://www.praha.camp" target="_blank">www.praha.camp</a>
+          </p>
+        </div>
+      </div>
+      <div id="featureContent" style="display: none;"></div>
+      <div id="carouselContainer" style="display: none;">
+        <div id="carouselTrack"></div>
+        <button onclick="goToSlide(currentSlideIndex - 1)" class="carousel-btn prev-btn">
+          <svg width="24" height="40" fill="none" stroke="white" stroke-width="4"><polyline points="20 4 4 20 20 36"></polyline></svg>
+        </button>
+        <button onclick="goToSlide(currentSlideIndex + 1)" class="carousel-btn next-btn">
+          <svg width="24" height="40" fill="none" stroke="white" stroke-width="4"><polyline points="4 4 20 20 4 36"></polyline></svg>
+        </button>
+        <div id="carouselDots" class="carousel-dots"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
